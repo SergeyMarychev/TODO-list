@@ -5,6 +5,7 @@ import { Task, tasks, renderTask } from './task.js';
 import getGuid from './utils.js';
 import initEditModal from './js/modals/editModal.js';
 import Counter from './counter.js';
+import taskService from './js/api/taskService.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 	let countTasks = 0;
@@ -21,6 +22,18 @@ document.addEventListener('DOMContentLoaded', () => {
 		tasksDeleted = document.querySelector('#tasksDeleted');
 
 	const descriptionModal = new bootstrap.Modal('#description-modal');
+
+	const clear = () => {
+		counterDeleted.clear();
+		counterCompleted.clear();
+		counterImportant.clear();
+		counterInProcess.clear();
+
+		tasksInProcess.textContent = '';
+		tasksImportant.textContent = '';
+		tasksCompleted.textContent = '';
+		tasksDeleted.textContent = '';
+	};
 
 	const initTooltips = () => {
 		const tooltipTriggerList = document.querySelectorAll(
@@ -123,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>`
 		);
 
-		renderTask(task.id);
+		renderTask(task);
 		addTaskEvents(task.id, container);
 
 		initTooltips();
@@ -139,67 +152,27 @@ document.addEventListener('DOMContentLoaded', () => {
 			taskNameInput.classList.remove('is-invalid');
 		}
 
-		const task = new Task(taskName);
-		tasks.push(task);
-
-		taskNameInput.value = '';
-		addTaskToDom(task, tasksInProcess);
-		counterInProcess.increment();
-		Cookies.set('tasks', JSON.stringify(tasks));
+		taskService.create(taskName).then(() => {
+			taskNameInput.value = '';
+			initTasks();
+		});
 	};
 
 	const removeTask = function (id, isHard) {
-		const task = tasks.find((t) => t.id === id);
-		document
-			.querySelectorAll(`.col-card[data-id="${id}"]`)
-			.forEach((e) => e.remove());
-
-		if (isHard) {
-			if (!task.isDeleted) {
-				if (!task.isCompleted) {
-					counterInProcess.decrement();
-				} else {
-					counterCompleted.decrement();
-				}
-
-				if (task.isImportant && !task.isCompleted) {
-					counterImportant.decrement();
-				}
-			} else {
-				counterDeleted.decrement();
-			}
-
-			const index = tasks.findIndex((task) => task.id === id);
-			tasks.splice(index, 1);
-		} else {
-			task.isDeleted = true;
-			addTaskToDom(task, tasksDeleted);
-			if (!task.isCompleted) {
-				counterInProcess.decrement();
-			} else {
-				counterCompleted.decrement();
-			}
-
-			if (task.isImportant && !task.isCompleted) {
-				counterImportant.decrement();
-			}
-
-			counterDeleted.increment();
-		}
-
-		Cookies.set('tasks', JSON.stringify(tasks));
+		taskService.delete(id, !isHard).then(() => {
+			initTasks();
+		});
 	};
 
 	const editTask = function () {
 		const id = this.dataset.id;
 		document.querySelector('#edit-modal .id').value = id;
 
-		const task = tasks.find((t) => t.id === id);
-
-		document.querySelector('#edit-name').value = task.name;
-		document.querySelector('#edit-description').value = task.description;
-
-		Cookies.set('tasks', JSON.stringify(tasks));
+		taskService.get(id).then((task) => {
+			document.querySelector('#edit-name').value = task.name;
+			document.querySelector('#edit-description').value =
+				task.description;
+		});
 	};
 
 	const deletePopover = () => {
@@ -212,12 +185,16 @@ document.addEventListener('DOMContentLoaded', () => {
 	document.addEventListener('click', (e) => {
 		if (e.target.classList.contains('hard-delete')) {
 			const taskId = e.target.classList[3];
-			removeTask(taskId, true);
+			taskService.delete(taskId).then(() => {
+				initTasks();
+			});
 			deletePopover();
 		}
 		if (e.target.classList.contains('soft-delete')) {
 			const taskId = e.target.classList[4];
-			removeTask(taskId);
+			taskService.delete(taskId, true).then(() => {
+				initTasks();
+			});
 			deletePopover();
 		}
 
@@ -227,70 +204,22 @@ document.addEventListener('DOMContentLoaded', () => {
 	const addDescription = function () {
 		const id = this.dataset.id;
 		document.querySelector('#description-modal .id').value = id;
-
-		Cookies.set('tasks', JSON.stringify(tasks));
 	};
 
 	const changeImportantSwitch = function () {
 		const id = this.dataset.id;
-		const task = tasks.find((t) => t.id === id);
 
-		if (this.checked) {
-			task.isImportant = true;
-			addTaskToDom(task, tasksImportant);
-			counterImportant.increment();
-		} else {
-			const taskContainer = tasksImportant.querySelector(
-				`.col-card[data-id="${id}"]`
-			);
-			taskContainer.remove();
-			task.isImportant = false;
-			renderTask(task.id);
-			counterImportant.decrement();
-		}
-
-		Cookies.set('tasks', JSON.stringify(tasks));
+		taskService.update(id, this.checked).then(() => {
+			initTasks();
+		});
 	};
 
 	const changeCompletedSwitch = function () {
 		const id = this.dataset.id;
-		const task = tasks.find((t) => t.id === id);
 
-		if (this.checked) {
-			task.isCompleted = true;
-
-			if (task.isImportant) {
-				const taskContainer = tasksImportant.querySelector(
-					`.col-card[data-id="${id}"]`
-				);
-				taskContainer.remove();
-			}
-			const taskContainer = tasksInProcess.querySelector(
-				`.col-card[data-id="${id}"]`
-			);
-			tasksCompleted.appendChild(taskContainer);
-			counterCompleted.increment();
-			counterInProcess.decrement();
-			if (task.isImportant) {
-				counterImportant.decrement();
-			}
-		} else {
-			task.isCompleted = false;
-			const taskContainer = tasksCompleted.querySelector(
-				`.col-card[data-id="${id}"]`
-			);
-			tasksInProcess.appendChild(taskContainer);
-			addTaskToDom(task, tasksImportant);
-			counterCompleted.decrement();
-			counterInProcess.increment();
-			if (task.isImportant) {
-				counterImportant.increment();
-			}
-		}
-
-		renderTask(task.id);
-
-		Cookies.set('tasks', JSON.stringify(tasks));
+		taskService.update(id, null, this.checked).then(() => {
+			initTasks();
+		});
 	};
 
 	const addTaskEvents = (taskId, container) => {
@@ -330,41 +259,47 @@ document.addEventListener('DOMContentLoaded', () => {
 		);
 		const taskId = document.querySelector('#description-modal .id').value;
 
-		const task = tasks.find((t) => t.id === taskId);
-		task.description = descriptionInput.value;
-		renderTask(taskId);
-
-		descriptionInput.value = '';
-		descriptionModal.hide();
-
-		Cookies.set('tasks', JSON.stringify(tasks));
+		taskService
+			.update(taskId, null, null, null, descriptionInput.value)
+			.then(() => {
+				descriptionInput.value = '';
+				descriptionModal.hide();
+				initTasks();
+			});
 	};
 
 	document
 		.querySelector('#description-modal .save')
 		.addEventListener('click', descriptionModalSave);
 
-	initEditModal();
-
 	const initTasks = () => {
-		tasks.forEach((task) => {
-			if (task.isDeleted) {
-				addTaskToDom(task, tasksDeleted);
-				counterDeleted.increment();
-			} else if (task.isCompleted) {
-				addTaskToDom(task, tasksCompleted);
-				counterCompleted.increment();
-			} else {
-				addTaskToDom(task, tasksInProcess);
-				counterInProcess.increment();
+		taskService.getAll().then((tasks) => {
+			clear();
 
-				if (task.isImportant) {
-					addTaskToDom(task, tasksImportant);
-					counterImportant.increment();
-				}
+			if (!tasks) {
+				return;
 			}
+
+			tasks.forEach((task) => {
+				if (task.isDeleted) {
+					addTaskToDom(task, tasksDeleted);
+					counterDeleted.increment();
+				} else if (task.isCompleted) {
+					addTaskToDom(task, tasksCompleted);
+					counterCompleted.increment();
+				} else {
+					addTaskToDom(task, tasksInProcess);
+					counterInProcess.increment();
+
+					if (task.isImportant) {
+						addTaskToDom(task, tasksImportant);
+						counterImportant.increment();
+					}
+				}
+			});
 		});
 	};
 
 	initTasks();
+	initEditModal(initTasks);
 });

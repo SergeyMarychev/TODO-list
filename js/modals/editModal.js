@@ -1,27 +1,28 @@
-import { renderTask, tasks } from '../../task.js';
+import taskService from '../api/taskService.js';
 
 const editModal = new bootstrap.Modal('#edit-modal');
 
-const editModalSave = () => {
+const editModalSave = (onUpdate) => {
 	const nameInput = document.querySelector('#edit-name');
 	const descriptionInput = document.querySelector('#edit-description');
 	const taskId = document.querySelector('#edit-modal .id').value;
 
-	const task = tasks.find((t) => t.id === taskId);
-	task.description = descriptionInput.value;
-	task.name = nameInput.value;
-	renderTask(taskId);
-
-	descriptionInput.value = '';
-	nameInput.value = '';
-
-	editModal.hide();
+	taskService
+		.update(taskId, null, null, nameInput.value, descriptionInput.value)
+		.then(() => {
+			descriptionInput.value = '';
+			nameInput.value = '';
+			editModal.hide();
+			onUpdate();
+		});
 };
 
-const initEditModal = () => {
+const initEditModal = (onUpdate) => {
 	document
 		.querySelector('#edit-modal .save')
-		.addEventListener('click', editModalSave);
+		.addEventListener('click', () => {
+			editModalSave(onUpdate);
+		});
 };
 
 export default initEditModal;

@@ -14,9 +14,9 @@ export class Task {
 export const tasks =
 	Cookies.get('tasks') == undefined ? [] : JSON.parse(Cookies.get('tasks'));
 
-export const renderTask = (taskId) => {
+export const renderTask = (task) => {
 	const taskContainers = document.querySelectorAll(
-		`.col-card[data-id="${taskId}"]`
+		`.col-card[data-id="${task.id}"]`
 	);
 	taskContainers.forEach((taskContainer) => {
 		const addDescription = taskContainer.querySelector('.addDescription');
@@ -26,8 +26,6 @@ export const renderTask = (taskId) => {
 			taskContainer.querySelector('.important-switch');
 		const completedSwitch =
 			taskContainer.querySelector('.completed-switch');
-
-		const task = tasks.find((t) => t.id === taskId);
 
 		taskName.textContent = task.name;
 		importantSwitch.checked = task.isImportant;
@@ -54,6 +52,9 @@ export const renderTask = (taskId) => {
 
 		if (task.isDeleted) {
 			taskContainer.querySelector('.base-delete').style.display = 'none';
+			importantSwitch.disabled = true;
+			taskContainer.querySelector('.edit').style.display = 'none';
+			addDescription.disabled = true;
 		} else {
 			taskContainer.querySelector('.full-delete').style.display = 'none';
 		}

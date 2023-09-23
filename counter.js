@@ -13,4 +13,9 @@ export default class Counter {
 		this.value--;
 		this.element.textContent = this.value;
 	}
+
+	clear() {
+		this.value = 0;
+		this.element.textContent = this.value;
+	}
 }
